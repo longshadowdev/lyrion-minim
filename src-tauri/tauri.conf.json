@@ -18,11 +18,19 @@
         "open": true
       }
     },
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "lyrion-minim",
-        "width": 800,
-        "height": 600
+        "width": 440,
+        "height": 700,
+        "fullscreen": false,
+        "resizable": false,
+        "visible": false,
+        "hiddenTitle": true,
+        "decorations": false,
+        "focus": false,
+        "transparent": true
       }
     ],
     "security": {
@@ -39,6 +47,11 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ]
+    },
+    "systemTray": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": false,
+      "menuOnLeftClick": false
     }
   }
 }
