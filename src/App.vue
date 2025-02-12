@@ -6,6 +6,8 @@ import { process } from "@tauri-apps/api";
 import { invoke } from "@tauri-apps/api/tauri";
 
 let iframeSrc = ref("about:blank");
+let debug = ref(false);
+let debugMessage = ref("");
 let squeezeliteCommand: Command|null = null;
 let squeezeliteProcess: Child|null = null;
 let clientName = "Lyrion Minim";
@@ -14,6 +16,11 @@ let clientName = "Lyrion Minim";
 listen("quit", async () => {
   await stopSqueezelite();
   process.exit(0).then(console.log).catch(console.error).finally(console.log);
+});
+
+// Debug menu item clicked
+listen("debug", async () => {
+  debug.value = true;
 });
 
 function startSqueezelite() {
@@ -27,7 +34,7 @@ function startSqueezelite() {
     .then((process) => {
       squeezeliteProcess = process;
       console.log('Squeezelite process started ' + squeezeliteProcess.pid);
-      
+      debugMessage.value +="Pid: " + squeezeliteProcess.pid;
     })
     .catch(console.log)
     .finally(console.log);
@@ -45,6 +52,7 @@ async function init() {
   startSqueezelite();
   let lmsServer = await invoke("detect_lms_server");
   iframeSrc.value = "http://" + lmsServer + "/Material/now-playing?single=1&player=" + clientName;
+  debugMessage.value += " URL: " + iframeSrc.value;
 }
 
 init();
@@ -52,6 +60,7 @@ init();
 
 <template>
   <iframe :src="iframeSrc" scrolling="no"></iframe>
+  <div id="debug" v-show="debug">{{debugMessage}}</div>
 </template>
 
 <style>
@@ -78,8 +87,15 @@ iframe, #config, #splash {
   opacity: 0.85;
   color: white;
 }
-
 input {
   color:white;
+}
+#debug {
+  position: fixed;
+  margin-top: -1.5em;
+  background-color: black;
+  color: white;
+  font-size: 1em;
+  z-index: 9;
 }
 </style>
