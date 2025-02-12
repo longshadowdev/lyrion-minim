@@ -5,6 +5,7 @@ import { appConfigDir} from "@tauri-apps/api/path";
 import { Command, Child } from "@tauri-apps/api/shell";
 import { listen } from "@tauri-apps/api/event";
 import { process } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/tauri";
 
 const states = {
   LOADING: "loading",
@@ -105,8 +106,12 @@ setState(states.LOADING);
 
 
 async function showLyrion() {
-
   startSqueezelite();
+
+  let lmsServer = await invoke("detect_lms_server");
+  console.log("LMSServer: " + lmsServer);
+  config.value.lyrionBaseUrl = "http://" + lmsServer;
+  
   iframeSrc.value = config.value.lyrionBaseUrl + "/Material/now-playing?single=1&player=" + config.value.clientName;
   setState(states.RUNNING);
 }
