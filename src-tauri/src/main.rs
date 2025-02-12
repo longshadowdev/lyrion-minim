@@ -1,8 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu};
+use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
 use tauri_plugin_positioner::{Position, WindowExt};
+use std::time::Duration;
+use std::format;
+use discover::discover;
+mod discover;
+
+#[tauri::command]
+async fn detect_lms_server() -> String {
+    let reply = discover(Duration::from_secs(5)).await.unwrap();
+    return format!("{}:{}", reply.hostname, reply.port);
+}
 
 fn main() {
     tauri::Builder::default()
@@ -13,8 +23,6 @@ fn main() {
                     .add_item(
                         CustomMenuItem::new("quit", "Quit")
                             .accelerator("Cmd+Q")
-                    ).add_item(
-                        CustomMenuItem::new("settings", "Settings")
                     )
             )
         )
@@ -45,13 +53,6 @@ fn main() {
                             .emit("quit", ())
                             .unwrap();
                     },
-                    // User has clicked the settings menu item
-                    "settings" => {
-                        app.get_window("main")
-                            .unwrap()
-                            .emit("settings", ())
-                            .unwrap();
-                    },
                     _ => {}
                 }
                 _ => {}
@@ -66,7 +67,7 @@ fn main() {
             }
             _ => {}
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![detect_lms_server])
         .run(tauri::generate_context!())
         .expect("Error while running Lyrion Minim");
 }
