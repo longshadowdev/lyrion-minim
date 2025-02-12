@@ -24,10 +24,16 @@ fn main() {
                         CustomMenuItem::new("quit", "Quit")
                             .accelerator("Cmd+Q")
                     )
+                    .add_item(CustomMenuItem::new("allow-resize", "Toggle Allow Resize"))
+                    .add_item(CustomMenuItem::new("allow-move", "Toggle Allow Move"))
+                    .add_item(CustomMenuItem::new("debug", "Toggle Debug"))
             )
         )
         .on_system_tray_event(move |app, event| {
             tauri_plugin_positioner::on_tray_event(app, &event);
+
+            let window = app.get_window("main").unwrap();
+
             match event {
                 // User has clicked the tray icon
                 SystemTrayEvent::LeftClick {
@@ -35,7 +41,7 @@ fn main() {
                     size: _,
                     ..
                 } => {
-                    let window = app.get_window("main").unwrap();
+                    //let window = app.get_window("main").unwrap();
                     // use TrayCenter as initial window position
                     let _ = window.move_window(Position::TrayCenter);
                     if window.is_visible().unwrap() {
@@ -48,10 +54,22 @@ fn main() {
                 SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
                     // User has clicked the quit menu item
                     "quit" => {
-                        app.get_window("main")
-                            .unwrap()
+                        window
                             .emit("quit", ())
                             .unwrap();
+                    },
+                    "allow-resize" => {
+                        window
+                            .set_resizable(!window.is_resizable().unwrap())
+                            .unwrap();
+                    },
+                    "allow-move" => {
+                        window
+                            .set_decorations(!window.is_decorated().unwrap())
+                            .unwrap();
+                    },
+                    "debug" => {
+                        window.emit("debug", ()).unwrap();
                     },
                     _ => {}
                 }
