@@ -23,8 +23,6 @@ fn main() {
                     .add_item(
                         CustomMenuItem::new("quit", "Quit")
                             .accelerator("Cmd+Q")
-                    ).add_item(
-                        CustomMenuItem::new("settings", "Settings")
                     )
             )
         )
@@ -53,13 +51,6 @@ fn main() {
                         app.get_window("main")
                             .unwrap()
                             .emit("quit", ())
-                            .unwrap();
-                    },
-                    // User has clicked the settings menu item
-                    "settings" => {
-                        app.get_window("main")
-                            .unwrap()
-                            .emit("settings", ())
                             .unwrap();
                     },
                     _ => {}
