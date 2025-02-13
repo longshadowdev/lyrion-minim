@@ -23,10 +23,6 @@ listen("debug", async () => {
   debug.value = !debug.value;
 });
 
-function sleep(seconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-}
-
 async function startSqueezelite() {
   // Don't start it twice!
   if (squeezeliteCommand !== null) {
