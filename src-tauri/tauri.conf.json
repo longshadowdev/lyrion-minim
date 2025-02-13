@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "lyrion-minim",
-    "version": "0.2.1-debug"
+    "version": "0.2.2"
   },
   "tauri": {
     "allowlist": {
@@ -55,7 +55,7 @@
         "width": 440,
         "height": 700,
         "fullscreen": false,
-        "resizable": false,
+        "resizable": true,
         "visible": false,
         "hiddenTitle": true,
         "decorations": false,

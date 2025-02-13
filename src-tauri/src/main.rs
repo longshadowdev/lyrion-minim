@@ -24,9 +24,7 @@ fn main() {
                         CustomMenuItem::new("quit", "Quit")
                             .accelerator("Cmd+Q")
                     )
-                    .add_item(CustomMenuItem::new("allow-resize", "Toggle Allow Resize"))
-                    .add_item(CustomMenuItem::new("allow-move", "Toggle Allow Move"))
-                    .add_item(CustomMenuItem::new("debug", "Toggle Debug"))
+                    .add_item(CustomMenuItem::new("debug", "Toggle Debug Info"))
             )
         )
         .on_system_tray_event(move |app, event| {
@@ -56,16 +54,6 @@ fn main() {
                     "quit" => {
                         window
                             .emit("quit", ())
-                            .unwrap();
-                    },
-                    "allow-resize" => {
-                        window
-                            .set_resizable(!window.is_resizable().unwrap())
-                            .unwrap();
-                    },
-                    "allow-move" => {
-                        window
-                            .set_decorations(!window.is_decorated().unwrap())
                             .unwrap();
                     },
                     "debug" => {
