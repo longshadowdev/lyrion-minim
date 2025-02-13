@@ -5,12 +5,12 @@ import { listen } from "@tauri-apps/api/event";
 import { process } from "@tauri-apps/api";
 import { invoke } from "@tauri-apps/api/tauri";
 
-let iframeSrc = ref("about:blank");
-let debug = ref(false);
-let debugMessage = ref("");
+let iframeSrc = ref("loading.html");
+let debug = ref(true);
 let squeezeliteCommand: Command|null = null;
 let squeezeliteProcess: Child|null = null;
 let clientName = "Lyrion Minim";
+let pid = ref(0);
 
 // Quite menu item clicked
 listen("quit", async () => {
@@ -20,24 +20,23 @@ listen("quit", async () => {
 
 // Debug menu item clicked
 listen("debug", async () => {
-  debug.value = true;
+  debug.value = !debug.value;
 });
 
-function startSqueezelite() {
+function sleep(seconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+}
+
+async function startSqueezelite() {
   // Don't start it twice!
   if (squeezeliteCommand !== null) {
     return;
   }
 
   squeezeliteCommand = Command.sidecar("binaries/squeezelite", ["-n", clientName]);
-  squeezeliteCommand.spawn()
-    .then((process) => {
-      squeezeliteProcess = process;
-      console.log('Squeezelite process started ' + squeezeliteProcess.pid);
-      debugMessage.value +="Pid: " + squeezeliteProcess.pid;
-    })
-    .catch(console.log)
-    .finally(console.log);
+  squeezeliteProcess = await squeezeliteCommand.spawn();
+  pid.value = squeezeliteProcess.pid;
+  console.log('Squeezelite process started ' + squeezeliteProcess.pid);
 }
 
 async function stopSqueezelite() {
@@ -49,18 +48,19 @@ async function stopSqueezelite() {
 }
 
 async function init() {
-  startSqueezelite();
+  await startSqueezelite();
   let lmsServer = await invoke("detect_lms_server");
-  iframeSrc.value = "http://" + lmsServer + "/Material/now-playing?single=1&player=" + clientName;
-  debugMessage.value += " URL: " + iframeSrc.value;
+  iframeSrc.value = "http://" + lmsServer + "/Material/now-playing?player=" + clientName;
 }
 
+
 init();
+
 </script>
 
 <template>
   <iframe :src="iframeSrc" scrolling="no"></iframe>
-  <div id="debug" v-show="debug">{{debugMessage}}</div>
+  <div id="debug" v-show="debug">Pid: {{pid}}<br> URL: {{iframeSrc}}</div>
 </template>
 
 <style>
@@ -91,11 +91,12 @@ input {
   color:white;
 }
 #debug {
+  font-family: Arial, Helvetica, sans-serif;
   position: fixed;
-  margin-top: -1.5em;
+  margin-top: -2.5em;
   background-color: black;
   color: white;
-  font-size: 1em;
+  font-size: 0.7em;
   z-index: 9;
 }
 </style>
