@@ -9,50 +9,20 @@ use nom::{
 use std::time::Duration;
 use tokio::{net::UdpSocket, time::timeout};
 
-#[derive(Debug)]
-pub struct Reply {
-    pub hostname: String,
-    pub port: u16,
-    #[allow(dead_code)]
-    pub uuid: String
-}
-
-// The LMS server can be discovered by sending a broadcast UDP packet to port 3483.
-// Example of answer from LMS
-// "ENAME\u{10}myhostnameJSON\u{4}9000UUID$e9b557b8-92e2-45cd-8a95-8730ffd604a5VERS\u{5}8.3.1"
-// '$' = 36 in the ASCII table
-// Each value starts with a tag, followed by the length of the value in one byte, then the value
-// itself in the next length bytes.
-
-/// Discover the LMS server on the local network
-pub async fn discover(reply_timeout: Duration) -> Result<Reply> {
-
+pub async fn discover() -> Result<String> {
     let sock = UdpSocket::bind("0.0.0.0:0").await?;
     sock.set_broadcast(true)?;
-
-    let mut buf = [0; 1024];
-
-    loop {
-        let response = timeout(reply_timeout, broasdcast_and_recv(&mut buf, &sock)).await;
-        match response {
-            Ok(Ok(())) => break,
-            Ok(Err(e)) => return Err(e.into()),
-            Err(_) => {},
-        }
-    }
-
-    parse_reply(&buf)
-        .map(|(_, reply)| {
-            reply
-        })
-        .map_err(|error| error.to_owned().into())
-}
-
-async fn broasdcast_and_recv(buf: &mut [u8], sock: &UdpSocket) -> Result<()> {
-    let message = "eNAME\0JSON\0UUID\0VERS\0".as_bytes();
-    let _ = sock.send_to(&message, "255.255.255.255:3483").await?;
-    let _ = sock.recv(buf).await?;
-    Ok(())
+    let response = timeout(Duration::from_secs(5), async {
+        let message = "eNAME\0JSON\0UUID\0VERS\0".as_bytes();
+        let mut buf = vec![0u8; 1024];
+        let _ = sock.send_to(&message, "255.255.255.255:3483").await?;
+        let result = sock.recv_from(&mut buf).await?;
+        let ip = result.1.ip().to_string();
+        let port = parse_reply(&buf).unwrap().1.to_string();
+        let server = format!("{}:{}", ip, port).to_string();
+        Ok::<String, anyhow::Error>(server)
+    }).await;
+    Ok(response.unwrap().unwrap())
 }
 
 fn parse_tag<'a>(input: &'a [u8], start_tag: &str) -> IResult<&'a [u8], String> {
@@ -70,20 +40,16 @@ fn parse_hostname(input: &[u8]) -> IResult<&[u8], String> {
 }
 
 fn parse_port(input: &[u8]) -> IResult<&[u8], u16> {
-    map_res(|input| parse_tag(input, "JSON"), |s| s.parse::<u16>())(input)
+    map_res(
+        |input| parse_tag(input, "JSON"),
+        |s| s.parse::<u16>()
+    )(input)
 }
 
-fn parse_uuid(input: &[u8]) -> IResult<&[u8], String> {
-    parse_tag(input, "UUID")
-}
-
-fn parse_reply(input: &[u8]) -> IResult<&[u8], Reply> {
+fn parse_reply(input: &[u8]) -> IResult<&[u8], u16> {
     map(
-        tuple((parse_hostname, parse_port, parse_uuid)),
-        |(hostname, port, uuid)| Reply {
-            hostname,
+        tuple((parse_hostname, parse_port)),
+        |(_, port)| 
             port,
-            uuid
-        },
     )(input)
 }

@@ -3,15 +3,13 @@
 
 use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
 use tauri_plugin_positioner::{Position, WindowExt};
-use std::time::Duration;
 use std::format;
 use discover::discover;
 mod discover;
 
 #[tauri::command]
 async fn detect_lms_server() -> String {
-    let reply = discover(Duration::from_secs(5)).await.unwrap();
-    return format!("{}:{}", reply.hostname, reply.port);
+    return discover().await.unwrap();
 }
 
 fn main() {
