@@ -70,6 +70,9 @@
       "active": true,
       "targets": "all",
       "identifier": "com.lyrion-minim.app",
+      "category": "Music",
+      "shortDescription": "Lyrion Minim",
+      "longDescription": "Lyrion Minim. A minimal desktop client for Lyrion Music Server.",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
