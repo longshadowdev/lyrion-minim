@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@materializecss/materialize':
+        specifier: ^2.2.1
+        version: 2.2.1
       '@tauri-apps/api':
         specifier: ^1
         version: 1.6.0
@@ -202,6 +205,9 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.5.0':
     resolution: {integrity: sha512-gv3ZRaISU3fjPAgNsriBRqGWQL6quFx04YMPW/zD8XMLsU32mhCCbfbO6KZFLjvYpCZ8zyDEgqsgf+PwPaM7GQ==}
+
+  '@materializecss/materialize@2.2.1':
+    resolution: {integrity: sha512-mnuWqs32Zli7aZ0jLBV/DbDx48dBN84oLCmIXZEhRsWZ7zfs9BKCG5Bp3YE1QL37/v86rHovz0kHaNObiQcGmw==}
 
   '@rollup/rollup-android-arm-eabi@4.34.6':
     resolution: {integrity: sha512-+GcCXtOQoWuC7hhX1P00LqjjIiS/iOouHXhMdiDSnq/1DGTox4SpUvO52Xm+div6+106r+TcvOeo/cxvyEyTgg==}
@@ -654,6 +660,8 @@ snapshots:
     optional: true
 
   '@jridgewell/sourcemap-codec@1.5.0': {}
+
+  '@materializecss/materialize@2.2.1': {}
 
   '@rollup/rollup-android-arm-eabi@4.34.6':
     optional: true
