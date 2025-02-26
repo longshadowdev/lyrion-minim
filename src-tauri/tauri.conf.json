@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "lyrion-minim",
-    "version": "0.2.4"
+    "version": "0.2.5"
   },
   "tauri": {
     "allowlist": {
@@ -27,6 +27,10 @@
             "sidecar": true,
             "args": [
               "-n",
+              {
+                "validator": "\\S+"
+              },
+              "-M",
               {
                 "validator": "\\S+"
               }
