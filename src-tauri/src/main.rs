@@ -22,6 +22,9 @@ fn main() {
                         CustomMenuItem::new("quit", "Quit")
                             .accelerator("Cmd+Q")
                     )
+                    .add_item(
+                        CustomMenuItem::new("config", "Configuration")
+                    )
                     .add_item(CustomMenuItem::new("debug", "Toggle Debug Info"))
             )
         )
@@ -56,6 +59,9 @@ fn main() {
                     },
                     "debug" => {
                         window.emit("debug", ()).unwrap();
+                    },
+                    "config" => {
+                        window.emit("config", ()).unwrap();
                     },
                     _ => {}
                 }
