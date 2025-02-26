@@ -56,7 +56,7 @@ async function stopSqueezelite() {
 }
 
 function getOS() {
-  const platform = window.navigator?.userAgentData?.platform || window.navigator.platform,
+  const platform = window.navigator?.platform ?? 'unknown',
       macosPlatforms = ['macOS', 'Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'],
       windowsPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'];
   let os = null;
