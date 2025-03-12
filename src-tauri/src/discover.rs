@@ -6,23 +6,27 @@ use nom::{
     sequence::{preceded, tuple},
     IResult,
 };
+use std::collections::HashMap;
 use std::time::Duration;
 use tokio::{net::UdpSocket, time::timeout};
 
-pub async fn discover() -> Result<String> {
+pub async fn discover() -> Result<HashMap<String, String>> {
     let sock = UdpSocket::bind("0.0.0.0:0").await?;
     sock.set_broadcast(true)?;
-    let response = timeout(Duration::from_secs(5), async {
+    let response = timeout(Duration::from_secs(2), async {
         let message = "eNAME\0JSON\0UUID\0VERS\0".as_bytes();
         let mut buf = vec![0u8; 1024];
         let _ = sock.send_to(&message, "255.255.255.255:3483").await?;
         let result = sock.recv_from(&mut buf).await?;
         let ip = result.1.ip().to_string();
         let port = parse_reply(&buf).unwrap().1.to_string();
-        let server = format!("{}:{}", ip, port).to_string();
-        Ok::<String, anyhow::Error>(server)
+        //let server = format!("{}:{}", ip, port).to_string();
+        let mut server: HashMap<String, String> = HashMap::new();
+        server.insert("host".to_string(), ip);
+        server.insert("port".to_string(), port);
+        Ok::<HashMap<String, String>, anyhow::Error>(server)
     }).await;
-    Ok(response.unwrap().unwrap())
+    Ok(response.unwrap_or(Result::Ok(HashMap::new())).unwrap())
 }
 
 fn parse_tag<'a>(input: &'a [u8], start_tag: &str) -> IResult<&'a [u8], String> {
