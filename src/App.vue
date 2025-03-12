@@ -5,8 +5,11 @@ import { listen } from "@tauri-apps/api/event";
 import { process } from "@tauri-apps/api";
 import { invoke } from "@tauri-apps/api/tauri";
 import { getVersion } from "@tauri-apps/api/app";
-import { BaseDirectory, readTextFile, writeTextFile } from "@tauri-apps/api/fs";
+import { exists, BaseDirectory, createDir, readTextFile, writeTextFile } from "@tauri-apps/api/fs";
+import { appConfigDir } from "@tauri-apps/api/path";
 import { platform, Platform } from "@tauri-apps/api/os";
+
+const fileSpecVersion = 1;
 
 // State including config
 const state = ref({
@@ -15,7 +18,7 @@ const state = ref({
   configMode: true,
   configLoaded: false,
   config: {
-
+    fileSpecVersion: fileSpecVersion,
     client: {
       autostart: true,
       name: 'Lyrion Minim',
@@ -47,20 +50,29 @@ listen('config', async () => {
 let configManager = {
   configFileName: 'config.json',
   load: async () => {
-    state.value.config = await readTextFile(configManager.configFileName, { dir: BaseDirectory.AppConfig })
-      .then((data) => {
-        state.value.configMode = false;
-        state.value.configLoaded = true;
-        return JSON.parse(data);
-      })
-      .catch(() => state.value.config);
+    const loadedConfig = await readTextFile(configManager.configFileName, { dir: BaseDirectory.AppConfig })
+      .then((data) => JSON.parse(data))
+      .catch(() => false);
+    
+    if (loadedConfig && loadedConfig.fileSpecVersion === fileSpecVersion) {
+      state.value.configMode = false;
+      state.value.configLoaded = true;
+      state.value.config = loadedConfig;
+    }
   },
   save: async () => {
+    await configManager.createConfigDir();
     await writeTextFile(
       configManager.configFileName, 
       JSON.stringify(state.value.config), 
       { dir: BaseDirectory.AppConfig }
     ).catch((err) => console.log(err));
+  },
+  createConfigDir: async () => {
+    const configDir = await appConfigDir();
+    if (!await exists(configDir)) {
+      await createDir(await appConfigDir());
+    }
   }
 }
 
