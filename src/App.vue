@@ -4,158 +4,312 @@ import { Command, Child } from "@tauri-apps/api/shell";
 import { listen } from "@tauri-apps/api/event";
 import { process } from "@tauri-apps/api";
 import { invoke } from "@tauri-apps/api/tauri";
+import { getVersion } from "@tauri-apps/api/app";
+import { BaseDirectory, readTextFile, writeTextFile } from "@tauri-apps/api/fs";
+import { platform, Platform } from "@tauri-apps/api/os";
 
-let iframeSrc = ref("/loading.html");
-let debugMode = ref(false);
-let configMode = ref(false);
-let squeezeliteCommand: Command|null = null;
-let squeezeliteProcess: Child|null = null;
-let clientName = ref("Lyrion Minim");
-let serverUrl = ref("");
-let pid = ref(0);
+// State including config
+const state = ref({
+  version: '',
+  iframeSrc: 'about:blank',
+  configMode: true,
+  configLoaded: false,
+  config: {
+
+    client: {
+      autostart: true,
+      name: 'Lyrion Minim',
+    },
+    server: {
+      autodetect: true,
+      host: '',
+      port: 9000,
+    }
+  },
+  client: {
+    running: false,
+    squeezeliteProcess: <Child|null>(null)
+  },
+});
 
 // Quite menu item clicked
-listen("quit", async () => {
-  await stopSqueezelite();
-  process.exit(0)
-    .then(console.log)
-    .catch(console.error)
-    .finally(console.log);
+listen('quit', async () => {
+  await client.stop();
+  await process.exit(0);
 });
 
 // Debug menu item clicked
-listen("debug", async () => {
-  debugMode.value = !debugMode.value;
+listen('config', async () => {
+  state.value.configMode = !state.value.configMode;
 });
 
-// Debug menu item clicked
-listen("config", async () => {
-  configMode.value = !configMode.value;
+// Config Manager
+let configManager = {
+  configFileName: 'config.json',
+  load: async () => {
+    state.value.config = await readTextFile(configManager.configFileName, { dir: BaseDirectory.AppConfig })
+      .then((data) => {
+        state.value.configMode = false;
+        state.value.configLoaded = true;
+        return JSON.parse(data);
+      })
+      .catch(() => state.value.config);
+  },
+  save: async () => {
+    await writeTextFile(
+      configManager.configFileName, 
+      JSON.stringify(state.value.config), 
+      { dir: BaseDirectory.AppConfig }
+    ).catch((err) => console.log(err));
+  }
+}
+
+// Squeezelite Client Management
+let client = {
+  start: async (silent: boolean = false) => {
+    // Don't start it twice!
+    if (state.value.client.squeezeliteProcess !== null) {
+      return;
+    }
+    !silent ? messager.show('Starting Squeezelite') : null;
+    let squeezeliteCommand = Command.sidecar('binaries/squeezelite', [
+      '-n', state.value.config.client.name, 
+      '-M', await client.getClientType()
+    ]);
+    console.log(await client.getClientType());
+    state.value.client.squeezeliteProcess = await squeezeliteCommand.spawn();
+    state.value.client.running = true;
+    !silent ? messager.show('Squeezelite process started ' + state.value.client.squeezeliteProcess.pid) : null;
+  },
+  stop: async (silent: boolean = false) => {
+    if (state.value.client.squeezeliteProcess !== null) {
+    !silent ? messager.show('Stopping Squeezelite') : null;
+    await state.value.client.squeezeliteProcess.kill();
+    !silent ? messager.show('Squeezelite process stopped') : null;
+    state.value.client.squeezeliteProcess = null;
+  }
+  },
+  toggle: async (enabled: boolean) => {
+    enabled ? await client.start() : await client.stop();
+  },
+  restart: async () => {
+    messager.show('Restarting Squeezelite');
+    await client.stop(true);
+    await client.start(true);
+  },
+  getClientType: async () => {
+    const platformName: Platform = await platform();
+    const map = {
+      'linux': 'Linux',
+      'darwin': 'Mac',
+      'ios': 'Mac',
+      'freebsd': '',
+      'dragonfly': '',
+      'netbsd': '',
+      'openbsd': '',
+      'solaris': '',
+      'android': '',
+      'win32': 'Windows',
+    };
+    return 'SqueezeLite' + (map[platformName] ?? '');
+  }
+}
+
+// Snackbar message state
+const messageState = ref({
+  snackbar: false,
+  snackbarText: '',
+  timeout: 1000
 });
-
-async function startSqueezelite() {
-  console.log('Starting squeezelite');
-  // Don't start it twice!
-  if (squeezeliteProcess !== null) {
-    return;
-  }
-
-  squeezeliteCommand = Command.sidecar("binaries/squeezelite", ["-n", clientName.value, "-M", "SqueezeLite" + getOS()]);
-  squeezeliteProcess = await squeezeliteCommand.spawn();
-  pid.value = squeezeliteProcess.pid;
-  console.log('Squeezelite process started ' + squeezeliteProcess.pid);
-}
-
-async function stopSqueezelite() {
-  if (squeezeliteProcess !== null) {
-    console.log('Stopping squeezelite');
-    await squeezeliteProcess.kill();
-    console.log('Squeezelite process stopped ' + squeezeliteProcess.pid);
-    squeezeliteProcess = null;
+let messager = {
+  show: (text: string, timeout: number = 1000) => {
+    messager.hide();
+    messageState.value.timeout = timeout;
+    messageState.value.snackbarText = text;
+    messageState.value.snackbar = true;
+  },
+  hide: () => {
+    messageState.value.snackbarText = '';
+    messageState.value.snackbar = false;
   }
 }
 
-function getOS() {
-  const platform = window.navigator?.platform ?? 'unknown',
-      macosPlatforms = ['macOS', 'Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'],
-      windowsPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'];
-  let os = null;
-
-  if (macosPlatforms.indexOf(platform) !== -1) {
-    os = 'Mac';
-  } else if (windowsPlatforms.indexOf(platform) !== -1) {
-    os = 'Windows';
-  } else if (/Linux/.test(platform)) {
-    os = 'Linux';
-  } else {
-    os = '';
-  }
-
-  return os;
+async function toggleSqueezelite(item: Event) {
+  ((<HTMLInputElement>item.target).checked)
+    ? await client.start() 
+    : await client.stop();
+  
+  return true;
 }
 
-async function init() {
-  console.log('Init');
-  await startSqueezelite();
-  serverUrl.value = await invoke("detect_lms_server");
-  showPlayer();
+async function detectServer() {
+  if (!state.value.config.server.autodetect) return;
+  messager.show('Autodetecting server');
+  let server: { host: string, port: number } = await invoke('detect_lms_server');
+  console.log(server.host);
+  if (server?.host === undefined) {
+    messager.show('Unable to autodetect server. Please enter server manually.', 2000);
+    state.value.config.server.autodetect = false;
+  }
+  state.value.config.server.host = server.host ?? state.value.config.server.host;
+  state.value.config.server.port = server.port ?? state.value.config.server.port;
 }
 
 function showPlayer() {
-  iframeSrc.value = "http://" + serverUrl.value + "/Material/now-playing?player=" + clientName.value + "&layout=mobile";
+  state.value.iframeSrc = "http://" 
+    + state.value.config.server.host 
+    + ":" 
+    + state.value.config.server.port 
+    + "/Material/now-playing?player=" 
+    + state.value.config.client.name 
+    + "&layout=mobile";
 }
 
 async function saveConfig() {
-  // await invoke("save_config", {
-  //   clientName: clientName.value,
-  //   serverUrl: serverUrl.value
-  // });
-  console.log(clientName.value);
-  console.log(serverUrl.value);
-  await stopSqueezelite();
-  await startSqueezelite();
+  await configManager.save();
+  await client.restart();
   showPlayer();
-  configMode.value = false;
+  state.value.configMode = false;
+}
+
+async function init() {
+  console.log('Init yah');
+  state.value.version = await getVersion();
+  console.log('loading config');
+  await configManager.load();
+  console.log(state.value.config);
+  if (state.value.config.client.autostart) {
+    console.log('autostarting client');
+    await client.start();
+  }
+  
+  if (state.value.config.server.autodetect) {
+    console.log('auto detecting server');
+    await detectServer();
+  }
+
+  if (state.value.configLoaded) {
+    // Only show player if config has loaded from file. Otherwise the config
+    // screen would be shown
+    console.log('showing player');
+    showPlayer();
+  }
 }
 
 init();
-/**
-Config planning:
-
-LMS Server:
-- Auto detect
-- Manually set
-
-Squeezelite:
-- Client Name (on change, restart squeezelite)
-- Auto start / stop
-- Stop button 
-- Start button 
-- Show current status (including PID)
-
-*/
 </script>
 
 <template>
-  <iframe :src="iframeSrc" scrolling="no" v-show="!configMode"></iframe>
+  <iframe :src="state.iframeSrc" scrolling="no" v-show="!state.configMode"></iframe>
 
-  <div id="config" v-show="configMode" class="container" style="margin-top: 2em">
-    
-    <div class="row container" style="gap: 2em;">
+  <v-container id="config" class="bg-surface-variant" v-show="state.configMode">
+    <v-sheet class="pa-6 text-white mx-auto fill-height" >
 
-      <div class="s12 m6 center">
-        <img style="max-width: 20%; height:auto" src="/images/lyrion-logo.png">
-        <h4>Lyrion Minim</h4>
-        
-        <h5>Configuration</h5>
-      </div>
+      <v-card
+        class="mb-5"
+        border
+        append-avatar="/images/lyrion-logo.png"
+        :subtitle="'Version ' + state.version "
+        variant="tonal"
+      >
+        <template v-slot:title>
+          <span class="font-weight-black text-h5">Lyrion Minim</span>
+        </template>
+      </v-card>
 
-      <div class="s12 m6 input-field outlined">
-        <input id="clientName" v-model="clientName" type="text" placeholder="Lyrion Minim" maxlength="20">
-        <label for="clientName">Client Name</label>
-        <span class="supporting-text">The name you want to give this client in Lyrion Music Server</span>
-      </div>
+      <v-card
+        class="mb-5"
+        border
+        subtitle="Configure the built-in Squeezelite client"
+        title="Client Settings"
+      >
+        <v-row class="mt-1">
+          <v-col class="mx-4 pt-0">
+            <v-switch
+              class="mx-4"
+              v-model="state.client.running"
+              @change="toggleSqueezelite"
+              :label="state.client.squeezeliteProcess === null ? 'Stopped' : 'Started'"
+              hide-details
+            ></v-switch>
+          </v-col>
+          <v-col class="mx-4 pa-0">
+          <v-switch
+            class="mx-4"
+            v-model="state.config.client.autostart"
+            label="Auto start"
+            hide-details
+          ></v-switch>
+          </v-col>
+        </v-row>
+        <v-row class="pb-1">
+          <v-col>
+            <v-text-field 
+              class="mx-4" 
+              label="Client Name" 
+              placeholder="Lyrion Minim" 
+              v-model="state.config.client.name" 
+              hint="How this client will appear in Lyrion Music Server"
+            ></v-text-field>
+          </v-col>
+        </v-row>
+      </v-card>
 
-      <div class="s12 m6 input-field outlined">
-        <input id="serverUrl" type="text" v-model="serverUrl" placeholder="http://" maxlength="20">
-        <label for="serverUrl">Server Base URL</label>
-        <span class="supporting-text">Override the auto-detected servere URL. Format: host:port</span>
-      </div>
+      <v-card
+        class="mb-5"
+        border
+        subtitle="Configure the connection to Lyrion Music Server"
+        title="Server Settings"
+      >
+        <v-row class="mt-1">
+          <v-col class="mx-4 pa-0">
+            <v-switch
+              class="mx-4"
+              v-model="state.config.server.autodetect"
+              @change="detectServer"
+              label="Autodetect Server"
+              hide-details
+            ></v-switch>
+          </v-col>
+        </v-row>
+        <v-row class="pb-1">
+          <v-col>
+            <v-text-field 
+              class="ml-4"
+              :disabled="state.config.server.autodetect"
+              label="Host" 
+              placeholder="127.0.0.1" 
+              v-model="state.config.server.host" 
+              hint="Hostname or IP"
+            ></v-text-field>
+          </v-col>
+          <v-col>
+            <v-text-field 
+              class="mr-4"
+              :disabled="state.config.server.autodetect"
+              label="Port" 
+              placeholder="9000" 
+              v-model="state.config.server.port" 
+              hint="Network port"
+            ></v-text-field>
+          </v-col>
+        </v-row>
+      </v-card>
+      
+      <v-btn
+        size="large"
+        type="submit"
+        variant="tonal"
+        block
+        @click="saveConfig"
+      >
+        Save and continue
+      </v-btn>
 
-      <div class="s12 m6 center">
-        <button class="btn waves-effect waves-light blue-grey" name="action" @click="saveConfig">Save and Continue
-          <i class="material-icons right">music_note</i>
-        </button>
-      </div>
+    </v-sheet>
+  </v-container>
 
-    </div>
- 
-  </div>
-
-  <div id="debug" v-show="debugMode">
-    Pid: {{pid}}<br>
-    URL: {{iframeSrc}}
-  </div>
+  <v-snackbar v-model="messageState.snackbar" :timeout="messageState.timeout">{{messageState.snackbarText}}</v-snackbar>
 
 </template>
 
@@ -175,19 +329,6 @@ iframe, #config {
   border: none;
   padding: 0;
   margin: 0;
-  overflow: hidden;
-}
-input {
-  color:white;
-}
-#debug {
-  font-family: Arial, Helvetica, sans-serif;
-  position: fixed;
-  margin-top: -2.5em;
-  background-color: black;
-  color: white;
-  font-size: 0.7em;
-  z-index: 9;
   overflow: hidden;
 }
 </style>

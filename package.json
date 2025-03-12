@@ -10,9 +10,10 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@materializecss/materialize": "^2.2.1",
     "@tauri-apps/api": "^1",
-    "vue": "^3.5.13"
+    "vite-plugin-vuetify": "^2.1.0",
+    "vue": "^3.5.13",
+    "vuetify": "^3.7.14"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1",

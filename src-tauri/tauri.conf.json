@@ -7,8 +7,8 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "lyrion-minim",
-    "version": "0.2.5"
+    "productName": "Lyrion Minim",
+    "version": "0.2.6"
   },
   "tauri": {
     "allowlist": {
@@ -50,6 +50,15 @@
       },
       "path": {
         "all": true
+      },
+      "window": {
+        "setResizable": true,
+        "setDecorations": true,
+        "setPosition": true,
+        "setSize": true
+      },
+      "os": {
+        "all": true
       }
     },
     "macOSPrivateApi": true,
@@ -59,7 +68,7 @@
         "width": 440,
         "height": 700,
         "fullscreen": false,
-        "resizable": true,
+        "resizable": false,
         "visible": false,
         "hiddenTitle": true,
         "decorations": false,

@@ -4,16 +4,21 @@
 use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
 use tauri_plugin_positioner::{Position, WindowExt};
 use std::format;
+use std::collections::HashMap;
 use discover::discover;
 mod discover;
 
 #[tauri::command]
-async fn detect_lms_server() -> String {
+async fn detect_lms_server() -> HashMap<String, String> {
     return discover().await.unwrap();
 }
 
 fn main() {
     tauri::Builder::default()
+        .setup(|app|
+            // Hide dock icon
+            Ok(app.set_activation_policy(tauri::ActivationPolicy::Accessory))
+        )
         .plugin(tauri_plugin_positioner::init())
         .system_tray(
             SystemTray::new().with_menu(
@@ -25,7 +30,6 @@ fn main() {
                     .add_item(
                         CustomMenuItem::new("config", "Configuration")
                     )
-                    .add_item(CustomMenuItem::new("debug", "Toggle Debug Info"))
             )
         )
         .on_system_tray_event(move |app, event| {
@@ -40,7 +44,6 @@ fn main() {
                     size: _,
                     ..
                 } => {
-                    //let window = app.get_window("main").unwrap();
                     // use TrayCenter as initial window position
                     let _ = window.move_window(Position::TrayCenter);
                     if window.is_visible().unwrap() {
@@ -56,9 +59,6 @@ fn main() {
                         window
                             .emit("quit", ())
                             .unwrap();
-                    },
-                    "debug" => {
-                        window.emit("debug", ()).unwrap();
                     },
                     "config" => {
                         window.emit("config", ()).unwrap();
