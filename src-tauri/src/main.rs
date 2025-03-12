@@ -15,10 +15,12 @@ async fn detect_lms_server() -> HashMap<String, String> {
 
 fn main() {
     tauri::Builder::default()
-        .setup(|app|
+        .setup(|app| {
             // Hide dock icon
-            Ok(app.set_activation_policy(tauri::ActivationPolicy::Accessory))
-        )
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            Ok(())
+        })
         .plugin(tauri_plugin_positioner::init())
         .system_tray(
             SystemTray::new().with_menu(

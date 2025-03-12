@@ -11,7 +11,7 @@ edition = "2021"
 tauri-build = { version = "1", features = [] }
 
 [dependencies]
-tauri = { version = "1", features = [ "os-all", "window-set-size", "window-set-position", "window-set-decorations", "window-set-resizable", "process-exit", "shell-sidecar", "path-all", "fs-all", "system-tray", "macos-private-api"] }
+tauri = { version = "1", features = [ "fs-read-file", "fs-create-dir", "fs-exists", "fs-write-file", "os-all", "window-set-size", "window-set-position", "window-set-decorations", "window-set-resizable", "process-exit", "shell-sidecar", "path-all", "system-tray", "macos-private-api"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-positioner = { version = "1.0.4", features = ["system-tray"] }
