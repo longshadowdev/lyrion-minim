@@ -8,6 +8,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { exists, BaseDirectory, createDir, readTextFile, writeTextFile } from "@tauri-apps/api/fs";
 import { appConfigDir } from "@tauri-apps/api/path";
 import { platform, Platform } from "@tauri-apps/api/os";
+import { http } from "@tauri-apps/api";
 
 const fileSpecVersion = 1;
 
@@ -31,6 +32,7 @@ const state = ref({
   },
   client: {
     running: false,
+    needsRestart: false,
     squeezeliteProcess: <Child|null>(null)
   },
   server: {
@@ -69,13 +71,30 @@ let configManager = {
       configManager.configFileName, 
       JSON.stringify(state.value.config), 
       { dir: BaseDirectory.AppConfig }
-    ).catch((err) => console.log(err));
+    ).catch((err) => messager.show('Unable to save configuration: ' + err));
   },
   createConfigDir: async () => {
     const configDir = await appConfigDir();
     if (!await exists(configDir)) {
       await createDir(await appConfigDir());
     }
+  },
+  handleSave: async () => {
+    if (!await server.validate()) {
+      messager.show('Server is not reachable. Please ensure it is running and has the Material skin installed', 2000);
+      return;
+    }
+
+    await configManager.save();
+
+    if (state.value.client.needsRestart) {
+      await client.restart();
+      state.value.client.needsRestart = false;
+    }
+    
+    server.showPlayer();
+
+    state.value.configMode = false;
   }
 }
 
@@ -91,10 +110,18 @@ let client = {
       '-n', state.value.config.client.name, 
       '-M', await client.getClientType()
     ]);
-    console.log(await client.getClientType());
-    state.value.client.squeezeliteProcess = await squeezeliteCommand.spawn();
-    state.value.client.running = true;
-    !silent ? messager.show('Squeezelite process started ' + state.value.client.squeezeliteProcess.pid) : null;
+    state.value.client.squeezeliteProcess = await squeezeliteCommand.spawn()
+      .then((process) => {
+        state.value.client.running = true;
+        !silent ? messager.show('Squeezelite process started ' + process.pid) : null;
+        return process;
+      })
+      .catch((err) => {
+        messager.show('Unable to start Squeezelite ' + err);
+        console.log(err);
+        return null;
+      });
+    
   },
   stop: async (silent: boolean = false) => {
     if (state.value.client.squeezeliteProcess !== null) {
@@ -127,6 +154,13 @@ let client = {
       'win32': 'Windows',
     };
     return 'SqueezeLite' + (map[platformName] ?? '');
+  },
+  handleToggle: async (item: Event) => {
+    ((<HTMLInputElement>item.target).checked)
+      ? await client.start() 
+      : await client.stop();
+
+    return true;
   }
 }
 
@@ -149,67 +183,63 @@ let messager = {
   }
 }
 
-async function toggleSqueezelite(item: Event) {
-  ((<HTMLInputElement>item.target).checked)
-    ? await client.start() 
-    : await client.stop();
-  
-  return true;
-}
-
-async function detectServer() {
-  if (!state.value.config.server.autodetect) return;
-  state.value.server.loading = true;
-  messager.show('Autodetecting server');
-  let server: { host: string, port: number } = await invoke('detect_lms_server');
-  console.log(server.host);
-  if (server?.host === undefined) {
-    messager.show('Unable to autodetect server. Please enter server manually.', 2000);
-    state.value.config.server.autodetect = false;
+// Manage everything to do with the LMS server
+let server = {
+  detect: async () => {
+    if (!state.value.config.server.autodetect) return;
+    state.value.server.loading = true;
+    messager.show('Autodetecting server');
+    let server: { host: string, port: number } = await invoke('detect_lms_server');
+    if (server?.host === undefined) {
+      messager.show('Unable to autodetect server. Please enter server manually.', 2000);
+      state.value.config.server.autodetect = false;
+    }
+    state.value.config.server.host = server.host ?? state.value.config.server.host;
+    state.value.config.server.port = server.port ?? state.value.config.server.port;
+    state.value.server.loading = false;
+  },
+  validate: async () => {
+    // Make sure the server is reachable and has Material installed
+    return await http.fetch(server.getBaseUri(), { method: 'HEAD'})
+      .then(response => response.status === 200)
+      .catch(() => false);
+  },
+  showPlayer: () => {
+    state.value.iframeSrc = server.getUri();
+  },
+  getBaseUri: () => {
+    return "http://" 
+        + state.value.config.server.host 
+        + ":" 
+        + state.value.config.server.port 
+        + "/Material";
+  },
+  getUri: () => {
+    return server.getBaseUri() 
+        + "/now-playing?"
+        + "player=" + state.value.config.client.name 
+        + "&layout=mobile";
   }
-  state.value.config.server.host = server.host ?? state.value.config.server.host;
-  state.value.config.server.port = server.port ?? state.value.config.server.port;
-  state.value.server.loading = false;
-}
-
-function showPlayer() {
-  state.value.iframeSrc = "http://" 
-    + state.value.config.server.host 
-    + ":" 
-    + state.value.config.server.port 
-    + "/Material/now-playing?player=" 
-    + state.value.config.client.name 
-    + "&layout=mobile";
-}
-
-async function saveConfig() {
-  await configManager.save();
-  await client.restart();
-  showPlayer();
-  state.value.configMode = false;
 }
 
 async function init() {
-  console.log('Init yah');
+
+  console.log('Init');
   state.value.version = await getVersion();
-  console.log('loading config');
   await configManager.load();
-  console.log(state.value.config);
+
   if (state.value.config.client.autostart) {
-    console.log('autostarting client');
     await client.start();
   }
   
   if (state.value.config.server.autodetect) {
-    console.log('auto detecting server');
-    await detectServer();
+    await server.detect();
   }
 
   if (state.value.configLoaded) {
     // Only show player if config has loaded from file. Otherwise the config
     // screen would be shown
-    console.log('showing player');
-    showPlayer();
+    server.showPlayer();
   }
 }
 
@@ -241,11 +271,11 @@ init();
         title="Client Settings"
       >
         <v-row class="mt-1">
-          <v-col class="mx-4 pt-0">
+          <v-col class="mx-4 pa-0">
             <v-switch
               class="mx-4"
               v-model="state.client.running"
-              @change="toggleSqueezelite"
+              @change="client.handleToggle"
               :label="state.client.squeezeliteProcess === null ? 'Stopped' : 'Started'"
               hide-details
             ></v-switch>
@@ -265,7 +295,8 @@ init();
               class="mx-4" 
               label="Client Name" 
               placeholder="Lyrion Minim" 
-              v-model="state.config.client.name" 
+              v-model="state.config.client.name"
+              v-on:update:model-value="state.client.needsRestart = true"
               hint="How this client will appear in Lyrion Music Server"
             ></v-text-field>
           </v-col>
@@ -284,7 +315,7 @@ init();
             <v-switch
               class="mx-4"
               v-model="state.config.server.autodetect"
-              @change="detectServer"
+              @change="server.detect"
               label="Auto detect server"
               hide-details
               :disabled="state.server.loading"
@@ -302,7 +333,7 @@ init();
               hint="Hostname or IP"
             ></v-text-field>
           </v-col>
-          <v-col cols="4">
+          <v-col cols="5">
             <v-text-field 
               class="mr-4"
               :disabled="state.config.server.autodetect"
@@ -319,7 +350,7 @@ init();
         type="submit"
         variant="tonal"
         block
-        @click="saveConfig"
+        @click="configManager.handleSave"
       >
         Save and continue
       </v-btn>

@@ -59,6 +59,12 @@
       },
       "os": {
         "all": true
+      },
+      "http": {
+        "all": true,
+        "scope": [
+          "http://*/Material"
+        ]
       }
     },
     "macOSPrivateApi": true,
