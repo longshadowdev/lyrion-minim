@@ -87,7 +87,7 @@ let configManager = {
 
     await configManager.save();
 
-    if (state.value.client.needsRestart) {
+    if (state.value.client.needsRestart && state.value.client.running) {
       await client.restart();
       state.value.client.needsRestart = false;
     }
