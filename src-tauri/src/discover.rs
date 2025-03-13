@@ -13,7 +13,7 @@ use tokio::{net::UdpSocket, time::timeout};
 pub async fn discover() -> Result<HashMap<String, String>> {
     let sock = UdpSocket::bind("0.0.0.0:0").await?;
     sock.set_broadcast(true)?;
-    let response = timeout(Duration::from_secs(2), async {
+    let response = timeout(Duration::from_secs(5), async {
         let message = "eNAME\0JSON\0UUID\0VERS\0".as_bytes();
         let mut buf = vec![0u8; 1024];
         let _ = sock.send_to(&message, "255.255.255.255:3483").await?;

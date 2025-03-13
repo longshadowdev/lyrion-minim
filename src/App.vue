@@ -33,6 +33,9 @@ const state = ref({
     running: false,
     squeezeliteProcess: <Child|null>(null)
   },
+  server: {
+    loading: false
+  }
 });
 
 // Quite menu item clicked
@@ -156,6 +159,7 @@ async function toggleSqueezelite(item: Event) {
 
 async function detectServer() {
   if (!state.value.config.server.autodetect) return;
+  state.value.server.loading = true;
   messager.show('Autodetecting server');
   let server: { host: string, port: number } = await invoke('detect_lms_server');
   console.log(server.host);
@@ -165,6 +169,7 @@ async function detectServer() {
   }
   state.value.config.server.host = server.host ?? state.value.config.server.host;
   state.value.config.server.port = server.port ?? state.value.config.server.port;
+  state.value.server.loading = false;
 }
 
 function showPlayer() {
@@ -272,6 +277,7 @@ init();
         border
         subtitle="Configure the connection to Lyrion Music Server"
         title="Server Settings"
+        :loading="state.server.loading"
       >
         <v-row class="mt-1">
           <v-col class="mx-4 pa-0">
@@ -279,8 +285,9 @@ init();
               class="mx-4"
               v-model="state.config.server.autodetect"
               @change="detectServer"
-              label="Autodetect Server"
+              label="Auto detect server"
               hide-details
+              :disabled="state.server.loading"
             ></v-switch>
           </v-col>
         </v-row>
@@ -295,7 +302,7 @@ init();
               hint="Hostname or IP"
             ></v-text-field>
           </v-col>
-          <v-col>
+          <v-col cols="4">
             <v-text-field 
               class="mr-4"
               :disabled="state.config.server.autodetect"
@@ -307,7 +314,6 @@ init();
           </v-col>
         </v-row>
       </v-card>
-      
       <v-btn
         size="large"
         type="submit"
@@ -327,7 +333,7 @@ init();
 
 <style>
 body {
-  opacity: 0.95;
+  opacity: 0.97;
 }
 html, body, #app {
   margin: 0; 
